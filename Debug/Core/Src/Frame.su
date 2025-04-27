@@ -1,0 +1,2 @@
+../Core/Src/Frame.c:12:10:Calculate_CRC16	24	static
+../Core/Src/Frame.c:26:6:packframe	24	static
