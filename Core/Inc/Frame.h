@@ -8,7 +8,8 @@
 #ifndef INC_FRAME_H_
 #define INC_FRAME_H_
 #include "stm32f4xx.h"
-#include "stdint.h"
+#include <string.h>
+#include <stdlib.h>
 
 typedef struct
 {
@@ -21,5 +22,5 @@ typedef struct
 } frame_t;
 
 uint16_t Calculate_CRC16(uint8_t *data, uint16_t length);
-void packframe(uint8_t *outbuf, frame_t  trans, uint16_t crc_16);
+void packframe(uint8_t *outbuf, frame_t *trans, uint8_t command);
 #endif /* INC_FRAME_H_ */

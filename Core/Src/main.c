@@ -25,6 +25,7 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -72,36 +73,45 @@ frame_t transmit;
 uint8_t RX_data[20];
 uint8_t *tran_data;
 uint16_t frameSize = 0;
-uint8_t check_data_tran[100] = {0};
 uint8_t is_transmitting = 0;
+
+#define PI 3.14159265f
+
+float get_ADC(uint32_t sample_index, uint32_t num_samples)
+{
+    float angle = (2.0f * PI * sample_index) / num_samples;
+    float sine_value = sinf(angle);
+    float scaled_value = sine_value * 30.0f;
+    return scaled_value;
+}
+
+void SendADCValue(frame_t *trans) { // mo phong dang song ADC
+    trans->payload = calloc(trans->length, sizeof(uint8_t));
+    if (trans->payload == NULL) return;
+
+    for (uint16_t i = 0; i < trans->length/4; i++) {
+        float adc_value = get_ADC(i,trans->length/4); // Giả định hàm do đồng nghiệp bạn cung cấp
+        memcpy(&trans->payload[i * 4], &adc_value, 4); // Sao chép 4 byte của float
+    }
+}
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
 	if (htim == &htim2 && is_transmitting == 0 && tran_data != NULL) {
 	        is_transmitting = 1;  // Đánh dấu đang truyền
-	        HAL_UART_Transmit_DMA(&huart2, tran_data, frameSize);
+	        HAL_UART_Transmit_DMA(&huart2, tran_data,transmit.length + 7);
 	}
 }
 
 uint16_t check = 0;
+uint32_t rx_data = 0;
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size){
 	uint32_t rx_data = 0;
 	rx_data = atoi((char*)RX_data); // string => int
-	transmit.length = floorf(5000/rx_data);
-	frameSize = 7 + transmit.length;
-	transmit.payload = calloc(transmit.length,sizeof(uint8_t));
-	for(int i = 0; i< transmit.length;i++){
-		transmit.payload[i] = i;
-	}
-	tran_data = calloc(frameSize, sizeof(uint8_t));
-	tran_data[0] = transmit.start_bit;
-	tran_data[1] = transmit.command;
-	tran_data[2] = (uint8_t)(transmit.length >> 8);
-	tran_data[3] = (uint8_t)(transmit.length & 0xFF);
-	memcpy(&tran_data[4], transmit.payload, transmit.length);
-	check = Calculate_CRC16(&tran_data[1],transmit.length + 3); // temp ktr xiu nua xoa
-	transmit.CRC_16 = check;
-	packframe(tran_data, transmit, check);
-	memcpy(check_data_tran,tran_data,frameSize);
+	transmit.length = floorf(5000/rx_data)*4;
+	SendADCValue(&transmit);
+	frameSize = 7 + transmit.length*4;
+	tran_data = calloc(frameSize,sizeof(uint8_t));
+	packframe(tran_data, &transmit, 0x20);
 	HAL_TIM_Base_Start_IT(&htim2);
 	HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RX_data, 11);
 }
@@ -152,9 +162,8 @@ int main(void)
   MX_TIM2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  transmit.start_bit = 0xAA;
-  transmit.end = 0xAF;
-  transmit.command = 0x20; // 0x20 dung de gui gia tri ADC
+  transmit.start_bit=0xAA;
+  transmit.end = 0XAF;
   HAL_UARTEx_ReceiveToIdle_DMA(&huart2, RX_data, 11);
 
 
